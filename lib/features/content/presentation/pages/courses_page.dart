@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:focus/core/router/app_router.dart';
+import 'package:focus/core/utils/responsive.dart';
 import 'package:focus/features/content/domain/entities/course.dart';
 import 'package:focus/features/content/presentation/widgets/animated_progress_indicator.dart';
+import 'package:focus/features/content/presentation/cubit/course_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/course_state.dart';
 
 class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
@@ -18,9 +22,24 @@ class _CoursesPageState extends State<CoursesPage> {
   final List<String> _levels = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 
   @override
+  void initState() {
+    super.initState();
+    // Load courses from API
+    context.read<CourseCubit>().loadCourses();
+  }
+
+  void _applyFilters() {
+    context.read<CourseCubit>().loadCourses(
+      category: _selectedCategory != 'All' ? _selectedCategory : null,
+      level: _selectedLevel != 'All' ? _selectedLevel : null,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     return Scaffold(
-      appBar: AppBar(
+        appBar: AppBar(
         title: const Text('Courses'),
         actions: [
           IconButton(
@@ -40,109 +59,189 @@ class _CoursesPageState extends State<CoursesPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Category Filter
-          SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final isSelected = _selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedCategory = category;
-                      });
-                    },
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            children: [
+              // Category Filter
+              SizedBox(
+                height: responsive.getSpacing(mobile: 50, tablet: 60, desktop: 70),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.horizontalPadding,
+                    vertical: responsive.getSpacing(mobile: 8),
                   ),
-                );
-              },
-            ),
-          ),
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    final isSelected = _selectedCategory == category;
+                    return Padding(
+                      padding: EdgeInsets.only(right: responsive.getSpacing(mobile: 8)),
+                      child: FilterChip(
+                        label: Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 14 * responsive.fontSizeMultiplier,
+                          ),
+                        ),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedCategory = category;
+                          });
+                          _applyFilters();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
 
-          // Level Filter
-          SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _levels.length,
-              itemBuilder: (context, index) {
-                final level = _levels[index];
-                final isSelected = _selectedLevel == level;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(level),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedLevel = level;
-                      });
-                    },
+              // Level Filter
+              SizedBox(
+                height: responsive.getSpacing(mobile: 50, tablet: 60, desktop: 70),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.horizontalPadding,
+                    vertical: responsive.getSpacing(mobile: 8),
                   ),
-                );
-              },
-            ),
-          ),
+                  itemCount: _levels.length,
+                  itemBuilder: (context, index) {
+                    final level = _levels[index];
+                    final isSelected = _selectedLevel == level;
+                    return Padding(
+                      padding: EdgeInsets.only(right: responsive.getSpacing(mobile: 8)),
+                      child: FilterChip(
+                        label: Text(
+                          level,
+                          style: TextStyle(
+                            fontSize: 14 * responsive.fontSizeMultiplier,
+                          ),
+                        ),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedLevel = level;
+                          });
+                          _applyFilters();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
 
-          // Courses List
-          Expanded(
-            child: _buildCoursesList(context),
-          ),
-        ],
+              // Courses List
+              Expanded(
+                child: _buildCoursesList(context, responsive),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildCoursesList(BuildContext context) {
-    // Mock data - replace with actual data
-    final courses = _getMockCourses();
+  Widget _buildCoursesList(BuildContext context, Responsive responsive) {
+    return BlocBuilder<CourseCubit, CourseState>(
+      builder: (context, state) {
+        if (state is CourseLoading || state is CourseInitial) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (courses.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.school_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No courses found',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        if (state is CourseError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: responsive.getIconSize(mobile: 64, tablet: 72, desktop: 80),
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                SizedBox(height: responsive.getSpacing()),
+                Text(
+                  'Error: ${state.message}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * responsive.fontSizeMultiplier,
                   ),
+                ),
+                SizedBox(height: responsive.getSpacing()),
+                ElevatedButton(
+                  onPressed: () => _applyFilters(),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+          );
+        }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: courses.length,
-      itemBuilder: (context, index) {
-        return _buildCourseListItem(context, courses[index]);
+        final courses = state is CourseLoaded ? state.courses : <Course>[];
+
+        if (courses.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.school_outlined,
+                  size: responsive.getIconSize(mobile: 64, tablet: 72, desktop: 80),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                ),
+                SizedBox(height: responsive.getSpacing()),
+                Text(
+                  'No courses found',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * responsive.fontSizeMultiplier,
+                      ),
+                ),
+                SizedBox(height: responsive.getSpacing(mobile: 8)),
+                TextButton(
+                  onPressed: () => _applyFilters(),
+                  child: const Text('Refresh'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Use GridView for tablet/desktop, ListView for mobile
+        if (responsive.isMobile) {
+          return ListView.builder(
+            padding: EdgeInsets.all(responsive.horizontalPadding),
+            itemCount: courses.length,
+            itemBuilder: (context, index) {
+              return _buildCourseListItem(context, courses[index], responsive);
+            },
+          );
+        } else {
+          final crossAxisCount = responsive.getGridColumns(mobile: 1, tablet: 2, desktop: 3);
+          return GridView.builder(
+            padding: EdgeInsets.all(responsive.horizontalPadding),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: responsive.getSpacing(),
+              mainAxisSpacing: responsive.getSpacing(),
+              childAspectRatio: responsive.isTablet ? 0.75 : 0.7,
+            ),
+            itemCount: courses.length,
+            itemBuilder: (context, index) {
+              return _buildCourseListItem(context, courses[index], responsive);
+            },
+          );
+        }
       },
     );
   }
 
-  Widget _buildCourseListItem(BuildContext context, Course course) {
+  Widget _buildCourseListItem(BuildContext context, Course course, Responsive responsive) {
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: responsive.getSpacing()),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -167,7 +266,7 @@ class _CoursesPageState extends State<CoursesPage> {
           children: [
             // Course Image
             Container(
-              height: 180,
+              height: responsive.isMobile ? 180 : (responsive.isTablet ? 200 : 220),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: const BorderRadius.vertical(
@@ -179,7 +278,7 @@ class _CoursesPageState extends State<CoursesPage> {
                   Center(
                     child: Icon(
                       Icons.school,
-                      size: 64,
+                      size: responsive.getIconSize(mobile: 64, tablet: 72, desktop: 80),
                       color: theme.colorScheme.primary,
                     ),
                   ),
@@ -211,7 +310,7 @@ class _CoursesPageState extends State<CoursesPage> {
 
             // Course Info
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(responsive.getSpacing(mobile: 16, tablet: 20, desktop: 24)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -222,8 +321,9 @@ class _CoursesPageState extends State<CoursesPage> {
                           course.title,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
+                            fontSize: (theme.textTheme.titleLarge?.fontSize ?? 20) * responsive.fontSizeMultiplier,
                           ),
-                          maxLines: 2,
+                          maxLines: responsive.isMobile ? 2 : 3,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -365,53 +465,6 @@ class _CoursesPageState extends State<CoursesPage> {
     );
   }
 
-  List<Course> _getMockCourses() {
-    return [
-      const Course(
-        id: '1',
-        title: 'Complete Flutter Development Bootcamp',
-        description: 'Learn Flutter from scratch to advanced',
-        instructor: 'John Doe',
-        duration: '12 hours',
-        rating: 4.8,
-        enrolledCount: 1250,
-        imageUrl: '',
-        category: 'Programming',
-        level: 'Beginner',
-        isFree: false,
-        price: 49.99,
-        isEnrolled: true,
-        progress: 0.65,
-      ),
-      const Course(
-        id: '2',
-        title: 'UI/UX Design Masterclass',
-        description: 'Master design principles and tools',
-        instructor: 'Jane Smith',
-        duration: '8 hours',
-        rating: 4.9,
-        enrolledCount: 890,
-        imageUrl: '',
-        category: 'Design',
-        level: 'Intermediate',
-        isFree: true,
-      ),
-      const Course(
-        id: '3',
-        title: 'Advanced Flutter Patterns',
-        description: 'Deep dive into Flutter architecture',
-        instructor: 'John Doe',
-        duration: '10 hours',
-        rating: 4.7,
-        enrolledCount: 500,
-        imageUrl: '',
-        category: 'Programming',
-        level: 'Advanced',
-        isFree: false,
-        price: 79.99,
-      ),
-    ];
-  }
 
   void _showFilterDialog(BuildContext context) {
     showDialog(
@@ -432,6 +485,7 @@ class _CoursesPageState extends State<CoursesPage> {
                     setState(() {
                       _selectedCategory = category;
                     });
+                    _applyFilters();
                     Navigator.pop(context);
                   },
                 );
@@ -449,6 +503,7 @@ class _CoursesPageState extends State<CoursesPage> {
                     setState(() {
                       _selectedLevel = level;
                     });
+                    _applyFilters();
                     Navigator.pop(context);
                   },
                 );
@@ -468,6 +523,13 @@ class _CoursesPageState extends State<CoursesPage> {
 }
 
 class _CourseSearchDelegate extends SearchDelegate<String> {
+  @override
+  void showResults(BuildContext context) {
+    // Trigger search when user submits
+    final cubit = context.read<CourseCubit>();
+    cubit.loadCourses(search: query);
+    super.showResults(context);
+  }
   @override
   List<Widget> buildActions(BuildContext context) {
     return [
@@ -492,8 +554,43 @@ class _CourseSearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return Center(
-      child: Text('Search results for: $query'),
+    return BlocProvider<CourseCubit>.value(
+      value: context.read<CourseCubit>(),
+      child: BlocBuilder<CourseCubit, CourseState>(
+        builder: (context, state) {
+          if (state is CourseLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final courses = state is CourseLoaded 
+              ? state.courses.where((c) => 
+                  c.title.toLowerCase().contains(query.toLowerCase()) ||
+                  c.description.toLowerCase().contains(query.toLowerCase())
+                ).toList()
+              : <Course>[];
+          
+          if (courses.isEmpty) {
+            return Center(child: Text('No courses found for: $query'));
+          }
+          
+          return ListView.builder(
+            itemCount: courses.length,
+            itemBuilder: (context, index) {
+              final course = courses[index];
+              return ListTile(
+                title: Text(course.title),
+                subtitle: Text(course.instructor),
+                onTap: () {
+                  Navigator.of(context).pushNamed(
+                    AppRouter.courseDetailRoute,
+                    arguments: course,
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

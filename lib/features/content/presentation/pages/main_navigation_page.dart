@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:focus/core/di/service_locator.dart';
 import 'package:focus/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:focus/features/profile/presentation/cubit/profile_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/course_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/book_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/progress_cubit.dart';
 import 'package:focus/features/content/presentation/pages/home_page.dart';
 import 'package:focus/features/content/presentation/pages/courses_page.dart';
 import 'package:focus/features/content/presentation/pages/books_page.dart';
@@ -41,6 +44,15 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         providers: [
           BlocProvider<ProfileCubit>(
             create: (_) => sl<ProfileCubit>(),
+          ),
+          BlocProvider<CourseCubit>(
+            create: (_) => sl<CourseCubit>(),
+          ),
+          BlocProvider<BookCubit>(
+            create: (_) => sl<BookCubit>(),
+          ),
+          BlocProvider<ProgressCubit>(
+            create: (_) => sl<ProgressCubit>(),
           ),
         ],
         child: Scaffold(

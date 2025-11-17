@@ -20,7 +20,6 @@ class FocusApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-
         title: 'Focus',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
@@ -41,10 +40,63 @@ class FocusApp extends StatelessWidget {
             },
           ),
         ),
-        onGenerateRoute: router.onGenerateRoute,
+        onGenerateRoute: (settings) {
+          final route = router.onGenerateRoute(settings);
+          return route;
+        },
+        builder: (context, child) {
+          return BlocBuilder<AuthCubit, AuthState>(
+            builder: (context, state) {
+              // Show loading while checking auth state
+              if (state.status == AuthStatus.unknown) {
+                return const Scaffold(
+                  body: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              
+              // If authenticated and on login page, redirect to home
+              if (state.status == AuthStatus.authenticated) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final navigator = Navigator.maybeOf(context);
+                  if (navigator != null) {
+                    final currentRoute = ModalRoute.of(context)?.settings.name;
+                    if (currentRoute == AppRouter.loginRoute ||
+                        currentRoute == AppRouter.signUpRoute) {
+                      navigator.pushNamedAndRemoveUntil(
+                        AppRouter.homeRoute,
+                        (_) => false,
+                      );
+                    }
+                  }
+                });
+              }
+              
+              // If not authenticated and on protected route, redirect to login
+              if (state.status == AuthStatus.unauthenticated) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final navigator = Navigator.maybeOf(context);
+                  if (navigator != null) {
+                    final currentRoute = ModalRoute.of(context)?.settings.name;
+                    if (currentRoute != AppRouter.loginRoute &&
+                        currentRoute != AppRouter.signUpRoute &&
+                        currentRoute != AppRouter.forgotPasswordRoute) {
+                      navigator.pushNamedAndRemoveUntil(
+                        AppRouter.loginRoute,
+                        (_) => false,
+                      );
+                    }
+                  }
+                });
+              }
+              
+              return child ?? const SizedBox();
+            },
+          );
+        },
         initialRoute: AppRouter.loginRoute,
       ),
     );
   }
 }
-

@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:focus/core/router/app_router.dart';
+import 'package:focus/core/utils/responsive.dart';
 import 'package:focus/features/content/domain/entities/course.dart';
 import 'package:focus/features/content/domain/entities/book.dart';
 import 'package:focus/features/content/presentation/widgets/animated_progress_indicator.dart';
+import 'package:focus/features/content/presentation/cubit/course_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/course_state.dart';
+import 'package:focus/features/content/presentation/cubit/book_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/book_state.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -27,6 +33,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       curve: Curves.easeIn,
     );
     _animationController.forward();
+    
+    // Load data from API
+    context.read<CourseCubit>().loadRecommendedCourses();
+    context.read<BookCubit>().loadRecommendedBooks();
+    context.read<CourseCubit>().loadEnrolledCourses();
   }
 
   @override
@@ -57,79 +68,92 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Section
-              _buildWelcomeSection(context, colorScheme),
-              const SizedBox(height: 24),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final responsive = Responsive(context);
+            return SingleChildScrollView(
+              padding: responsive.padding,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: responsive.maxContentWidth,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Welcome Section
+                    _buildWelcomeSection(context, colorScheme, responsive),
+                    SizedBox(height: responsive.getSpacing()),
 
-              // Quick Stats
-              _buildQuickStats(context, colorScheme),
-              const SizedBox(height: 24),
+                    // Quick Stats
+                    _buildQuickStats(context, colorScheme, responsive),
+                    SizedBox(height: responsive.getSpacing()),
 
-              // Recommended Courses
-              _buildSectionHeader(
-                context,
-                'Recommended Courses',
-                onSeeAll: () {
-                  // Navigate using bottom nav - show hint
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tap "Courses" tab to see all courses'),
-                      duration: Duration(seconds: 2),
+                    // Recommended Courses
+                    _buildSectionHeader(
+                      context,
+                      'Recommended Courses',
+                      responsive: responsive,
+                      onSeeAll: () {
+                        // Navigate using bottom nav - show hint
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Tap "Courses" tab to see all courses'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildRecommendedCourses(context),
+                    SizedBox(height: responsive.getSpacing(mobile: 12)),
+                    _buildRecommendedCourses(context, responsive),
 
-              const SizedBox(height: 24),
+                    SizedBox(height: responsive.getSpacing()),
 
-              // Recommended Books
-              _buildSectionHeader(
-                context,
-                'Recommended Books',
-                onSeeAll: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tap "Books" tab to see all books'),
-                      duration: Duration(seconds: 2),
+                    // Recommended Books
+                    _buildSectionHeader(
+                      context,
+                      'Recommended Books',
+                      responsive: responsive,
+                      onSeeAll: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Tap "Books" tab to see all books'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildRecommendedBooks(context),
+                    SizedBox(height: responsive.getSpacing(mobile: 12)),
+                    _buildRecommendedBooks(context, responsive),
 
-              const SizedBox(height: 24),
+                    SizedBox(height: responsive.getSpacing()),
 
-              // Continue Learning
-              _buildSectionHeader(
-                context,
-                'Continue Learning',
-                onSeeAll: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tap "Progress" tab to see all progress'),
-                      duration: Duration(seconds: 2),
+                    // Continue Learning
+                    _buildSectionHeader(
+                      context,
+                      'Continue Learning',
+                      responsive: responsive,
+                      onSeeAll: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Tap "Progress" tab to see all progress'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                    SizedBox(height: responsive.getSpacing(mobile: 12)),
+                    _buildContinueLearning(context, responsive),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              _buildContinueLearning(context),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildWelcomeSection(BuildContext context, ColorScheme colorScheme) {
+  Widget _buildWelcomeSection(BuildContext context, ColorScheme colorScheme, Responsive responsive) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 600),
@@ -139,7 +163,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           child: Opacity(
             opacity: value,
             child: Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(responsive.getSpacing(mobile: 20, tablet: 24, desktop: 28)),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -159,13 +183,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 24) * responsive.fontSizeMultiplier,
                         ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: responsive.getSpacing(mobile: 8)),
                   Text(
                     'Ready to continue your learning journey?',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: (Theme.of(context).textTheme.bodyLarge?.fontSize ?? 16) * responsive.fontSizeMultiplier,
                         ),
                   ),
                 ],
@@ -177,7 +203,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildQuickStats(BuildContext context, ColorScheme colorScheme) {
+  Widget _buildQuickStats(BuildContext context, ColorScheme colorScheme, Responsive responsive) {
+    if (responsive.isMobile) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context,
+                  'Courses',
+                  '12',
+                  Icons.school,
+                  colorScheme.primary,
+                  responsive,
+                ),
+              ),
+              SizedBox(width: responsive.getSpacing(mobile: 12)),
+              Expanded(
+                child: _buildStatCard(
+                  context,
+                  'Books',
+                  '8',
+                  Icons.menu_book,
+                  colorScheme.secondary,
+                  responsive,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.getSpacing(mobile: 12)),
+          _buildStatCard(
+            context,
+            'Progress',
+            '68%',
+            Icons.trending_up,
+            colorScheme.tertiary,
+            responsive,
+          ),
+        ],
+      );
+    }
+    
     return Row(
       children: [
         Expanded(
@@ -187,9 +254,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             '12',
             Icons.school,
             colorScheme.primary,
+            responsive,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: responsive.getSpacing(mobile: 12)),
         Expanded(
           child: _buildStatCard(
             context,
@@ -197,9 +265,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             '8',
             Icons.menu_book,
             colorScheme.secondary,
+            responsive,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: responsive.getSpacing(mobile: 12)),
         Expanded(
           child: _buildStatCard(
             context,
@@ -207,6 +276,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             '68%',
             Icons.trending_up,
             colorScheme.tertiary,
+            responsive,
           ),
         ),
       ],
@@ -219,6 +289,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     String value,
     IconData icon,
     Color color,
+    Responsive responsive,
   ) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -229,7 +300,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           child: Opacity(
             opacity: animValue,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(responsive.getSpacing(mobile: 16, tablet: 20, desktop: 24)),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -237,20 +308,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               child: Column(
                 children: [
-                  Icon(icon, color: color, size: 28),
-                  const SizedBox(height: 8),
+                  Icon(icon, color: color, size: responsive.getIconSize(mobile: 28, tablet: 32, desktop: 36)),
+                  SizedBox(height: responsive.getSpacing(mobile: 8)),
                   Text(
                     value,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: color,
+                          fontSize: (Theme.of(context).textTheme.headlineSmall?.fontSize ?? 22) * responsive.fontSizeMultiplier,
                         ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: responsive.getSpacing(mobile: 4)),
                   Text(
                     label,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: color.withValues(alpha: 0.8),
+                          fontSize: (Theme.of(context).textTheme.bodySmall?.fontSize ?? 12) * responsive.fontSizeMultiplier,
                         ),
                   ),
                 ],
@@ -266,7 +339,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     BuildContext context,
     String title, {
     VoidCallback? onSeeAll,
+    Responsive? responsive,
   }) {
+    final r = responsive ?? Responsive(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -274,75 +349,104 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           title,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                fontSize: (Theme.of(context).textTheme.titleLarge?.fontSize ?? 20) * r.fontSizeMultiplier,
               ),
         ),
         if (onSeeAll != null)
           TextButton(
             onPressed: onSeeAll,
-            child: const Text('See all'),
+            child: Text(
+              'See all',
+              style: TextStyle(fontSize: 14 * r.fontSizeMultiplier),
+            ),
           ),
       ],
     );
   }
 
-  Widget _buildRecommendedCourses(BuildContext context) {
-    final courses = [
-      const Course(
-        id: '1',
-        title: 'Flutter Development',
-        description: 'Learn Flutter from scratch',
-        instructor: 'John Doe',
-        duration: '8 hours',
-        rating: 4.8,
-        enrolledCount: 1250,
-        imageUrl: '',
-        category: 'Programming',
-        level: 'Beginner',
-        isFree: false,
-        price: 49.99,
-      ),
-      const Course(
-        id: '2',
-        title: 'UI/UX Design',
-        description: 'Master design principles',
-        instructor: 'Jane Smith',
-        duration: '6 hours',
-        rating: 4.9,
-        enrolledCount: 890,
-        imageUrl: '',
-        category: 'Design',
-        level: 'Intermediate',
-        isFree: true,
-      ),
-    ];
+  Widget _buildRecommendedCourses(BuildContext context, Responsive responsive) {
+    return BlocBuilder<CourseCubit, CourseState>(
+      builder: (context, state) {
+        if (state is CourseLoading || state is CourseInitial) {
+          return const SizedBox(
+            height: 220,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        if (state is CourseError) {
+          return SizedBox(
+            height: 220,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: ${state.message}'),
+                  TextButton(
+                    onPressed: () => context.read<CourseCubit>().loadRecommendedCourses(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        final courses = state is CourseLoaded ? state.courses : <Course>[];
+        
+        if (courses.isEmpty) {
+          return SizedBox(
+            height: 220,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('No recommended courses available'),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => context.read<CourseCubit>().loadRecommendedCourses(),
+                    child: const Text('Refresh'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-    return SizedBox(
-      height: 220,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: courses.length,
-        itemBuilder: (context, index) {
-          return TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: Duration(milliseconds: 300 + (index * 100)),
-            builder: (context, value, child) {
-              return Transform.translate(
-                offset: Offset(50 * (1 - value), 0),
-                child: Opacity(
-                  opacity: value,
-                  child: _buildCourseCard(context, courses[index]),
-                ),
+        return SizedBox(
+          height: responsive.isMobile ? 220 : 280,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: responsive.getSpacing(mobile: 0)),
+            itemCount: courses.length,
+            itemBuilder: (context, index) {
+              return TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: Duration(milliseconds: 300 + (index * 100)),
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(50 * (1 - value), 0),
+                    child: Opacity(
+                      opacity: value,
+                      child: _buildCourseCard(context, courses[index], responsive),
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCourseCard(BuildContext context, Course course) {
+  Widget _buildCourseCard(BuildContext context, Course course, Responsive responsive) {
     final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width * 0.75;
+    final width = responsive.getHorizontalItemWidth(
+      mobile: responsive.width * 0.75,
+      tablet: responsive.width * 0.5,
+      desktop: responsive.width * 0.35,
+    );
 
     return GestureDetector(
       onTap: () {
@@ -434,62 +538,89 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildRecommendedBooks(BuildContext context) {
-    final books = [
-      const Book(
-        id: '1',
-        title: 'Clean Code',
-        author: 'Robert C. Martin',
-        description: 'A Handbook of Agile Software Craftsmanship',
-        rating: 4.7,
-        pageCount: 464,
-        imageUrl: '',
-        category: 'Programming',
-        language: 'English',
-        isFree: false,
-        price: 29.99,
-      ),
-      const Book(
-        id: '2',
-        title: 'Design Patterns',
-        author: 'Gang of Four',
-        description: 'Elements of Reusable Object-Oriented Software',
-        rating: 4.6,
-        pageCount: 395,
-        imageUrl: '',
-        category: 'Programming',
-        language: 'English',
-        isFree: true,
-      ),
-    ];
+  Widget _buildRecommendedBooks(BuildContext context, Responsive responsive) {
+    return BlocBuilder<BookCubit, BookState>(
+      builder: (context, state) {
+        if (state is BookLoading || state is BookInitial) {
+          return SizedBox(
+            height: responsive.isMobile ? 180 : 220,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        if (state is BookError) {
+          return SizedBox(
+            height: responsive.isMobile ? 180 : 220,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: ${state.message}'),
+                  TextButton(
+                    onPressed: () => context.read<BookCubit>().loadRecommendedBooks(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        final books = state is BookLoaded ? state.books : <Book>[];
+        
+        if (books.isEmpty) {
+          return SizedBox(
+            height: responsive.isMobile ? 180 : 220,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('No recommended books available'),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => context.read<BookCubit>().loadRecommendedBooks(),
+                    child: const Text('Refresh'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-    return SizedBox(
-      height: 180,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: books.length,
-        itemBuilder: (context, index) {
-          return TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: Duration(milliseconds: 300 + (index * 100)),
-            builder: (context, value, child) {
-              return Transform.translate(
-                offset: Offset(50 * (1 - value), 0),
-                child: Opacity(
-                  opacity: value,
-                  child: _buildBookCard(context, books[index]),
-                ),
+        return SizedBox(
+          height: responsive.isMobile ? 180 : 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: responsive.getSpacing(mobile: 0)),
+            itemCount: books.length,
+            itemBuilder: (context, index) {
+              return TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: Duration(milliseconds: 300 + (index * 100)),
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(50 * (1 - value), 0),
+                    child: Opacity(
+                      opacity: value,
+                      child: _buildBookCard(context, books[index], responsive),
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildBookCard(BuildContext context, Book book) {
+  Widget _buildBookCard(BuildContext context, Book book, Responsive responsive) {
     final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width * 0.6;
+    final width = responsive.getHorizontalItemWidth(
+      mobile: responsive.width * 0.6,
+      tablet: responsive.width * 0.4,
+      desktop: responsive.width * 0.25,
+    );
 
     return GestureDetector(
       onTap: () {
@@ -500,7 +631,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       },
       child: Container(
         width: width,
-        margin: const EdgeInsets.only(right: 12),
+        margin: EdgeInsets.only(right: responsive.getSpacing(mobile: 12)),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
@@ -513,12 +644,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(responsive.getSpacing(mobile: 12, tablet: 16, desktop: 20)),
           child: Row(
             children: [
               Container(
-                width: 60,
-                height: 90,
+                width: responsive.getIconSize(mobile: 60, tablet: 70, desktop: 80),
+                height: responsive.getIconSize(mobile: 90, tablet: 105, desktop: 120),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -574,39 +705,62 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildContinueLearning(BuildContext context) {
-    final inProgressCourses = [
-      const Course(
-        id: '3',
-        title: 'Advanced Flutter',
-        description: 'Deep dive into Flutter',
-        instructor: 'John Doe',
-        duration: '10 hours',
-        rating: 4.9,
-        enrolledCount: 500,
-        imageUrl: '',
-        category: 'Programming',
-        level: 'Advanced',
-        isEnrolled: true,
-        progress: 0.65,
-      ),
-    ];
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: inProgressCourses.length,
-      itemBuilder: (context, index) {
-        return TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: Duration(milliseconds: 400 + (index * 100)),
-          builder: (context, value, child) {
-            return Transform.translate(
-              offset: Offset(0, 20 * (1 - value)),
-              child: Opacity(
-                opacity: value,
-                child: _buildProgressCard(context, inProgressCourses[index]),
+  Widget _buildContinueLearning(BuildContext context, Responsive responsive) {
+    return BlocBuilder<CourseCubit, CourseState>(
+      builder: (context, state) {
+        if (state is CourseLoading || state is CourseInitial) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (state is CourseError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Error: ${state.message}'),
+                TextButton(
+                  onPressed: () => context.read<CourseCubit>().loadEnrolledCourses(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        final courses = state is CourseLoaded 
+            ? state.courses.where((c) => c.isEnrolled && c.progress > 0).toList()
+            : <Course>[];
+        
+        if (courses.isEmpty) {
+          return Center(
+            child: Text(
+              'No courses in progress',
+              style: TextStyle(
+                fontSize: 16 * responsive.fontSizeMultiplier,
               ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          scrollDirection: responsive.isMobile ? Axis.vertical : Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: responsive.getSpacing(mobile: 0)),
+          itemCount: courses.length,
+          itemBuilder: (context, index) {
+            return TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: Duration(milliseconds: 400 + (index * 100)),
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, 20 * (1 - value)),
+                  child: Opacity(
+                    opacity: value,
+                    child: _buildProgressCard(context, courses[index], responsive),
+                  ),
+                );
+              },
             );
           },
         );
@@ -614,7 +768,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildProgressCard(BuildContext context, Course course) {
+  Widget _buildProgressCard(BuildContext context, Course course, Responsive responsive) {
     final theme = Theme.of(context);
 
     return GestureDetector(
@@ -625,8 +779,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: EdgeInsets.only(bottom: responsive.getSpacing(mobile: 12)),
+        padding: EdgeInsets.all(responsive.getSpacing(mobile: 16, tablet: 20, desktop: 24)),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
@@ -644,7 +798,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(responsive.getSpacing(mobile: 12)),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -654,12 +808,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.play_circle_outline,
                     color: Colors.white,
+                    size: responsive.getIconSize(mobile: 24, tablet: 28, desktop: 32),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: responsive.getSpacing(mobile: 12)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,13 +823,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         course.title,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * responsive.fontSizeMultiplier,
                         ),
+                        maxLines: responsive.isMobile ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: responsive.getSpacing(mobile: 4)),
                       Text(
                         '${(course.progress * 100).toInt()}% Complete',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * responsive.fontSizeMultiplier,
                         ),
                       ),
                     ],
@@ -682,7 +841,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: responsive.getSpacing(mobile: 12)),
             AnimatedProgressIndicator(
               value: course.progress,
               minHeight: 8,

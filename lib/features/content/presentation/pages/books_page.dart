@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:focus/core/router/app_router.dart';
+import 'package:focus/core/utils/responsive.dart';
 import 'package:focus/features/content/domain/entities/book.dart';
 import 'package:focus/features/content/presentation/widgets/animated_progress_indicator.dart';
+import 'package:focus/features/content/presentation/cubit/book_cubit.dart';
+import 'package:focus/features/content/presentation/cubit/book_state.dart';
 
 class BooksPage extends StatefulWidget {
   const BooksPage({super.key});
@@ -15,7 +19,21 @@ class _BooksPageState extends State<BooksPage> {
   final List<String> _categories = ['All', 'Programming', 'Design', 'Business', 'Self-Help'];
 
   @override
+  void initState() {
+    super.initState();
+    // Load books from API
+    context.read<BookCubit>().loadBooks();
+  }
+
+  void _applyFilters() {
+    context.read<BookCubit>().loadBooks(
+      category: _selectedCategory != 'All' ? _selectedCategory : null,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final responsive = Responsive(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Books'),
@@ -31,83 +49,155 @@ class _BooksPageState extends State<BooksPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Category Filter
-          SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final isSelected = _selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedCategory = category;
-                      });
-                    },
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            children: [
+              // Category Filter
+              SizedBox(
+                height: responsive.getSpacing(mobile: 50, tablet: 60, desktop: 70),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.horizontalPadding,
+                    vertical: responsive.getSpacing(mobile: 8),
                   ),
-                );
-              },
-            ),
-          ),
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    final isSelected = _selectedCategory == category;
+                    return Padding(
+                      padding: EdgeInsets.only(right: responsive.getSpacing(mobile: 8)),
+                      child: FilterChip(
+                        label: Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 14 * responsive.fontSizeMultiplier,
+                          ),
+                        ),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedCategory = category;
+                          });
+                          _applyFilters();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
 
-          // Books List
-          Expanded(
-            child: _buildBooksList(context),
-          ),
-        ],
+              // Books List
+              Expanded(
+                child: _buildBooksList(context, responsive),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildBooksList(BuildContext context) {
-    final books = _getMockBooks();
+  Widget _buildBooksList(BuildContext context, Responsive responsive) {
+    return BlocBuilder<BookCubit, BookState>(
+      builder: (context, state) {
+        if (state is BookLoading || state is BookInitial) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (books.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.menu_book_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No books found',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        if (state is BookError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: responsive.getIconSize(mobile: 64, tablet: 72, desktop: 80),
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                SizedBox(height: responsive.getSpacing()),
+                Text(
+                  'Error: ${state.message}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * responsive.fontSizeMultiplier,
                   ),
+                ),
+                SizedBox(height: responsive.getSpacing()),
+                ElevatedButton(
+                  onPressed: () => _applyFilters(),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+          );
+        }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: books.length,
-      itemBuilder: (context, index) {
-        return _buildBookListItem(context, books[index]);
+        final books = state is BookLoaded ? state.books : <Book>[];
+
+        if (books.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.menu_book_outlined,
+                  size: responsive.getIconSize(mobile: 64, tablet: 72, desktop: 80),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                ),
+                SizedBox(height: responsive.getSpacing()),
+                Text(
+                  'No books found',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: (Theme.of(context).textTheme.titleMedium?.fontSize ?? 16) * responsive.fontSizeMultiplier,
+                      ),
+                ),
+                SizedBox(height: responsive.getSpacing(mobile: 8)),
+                TextButton(
+                  onPressed: () => _applyFilters(),
+                  child: const Text('Refresh'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Use GridView for tablet/desktop, ListView for mobile
+        if (responsive.isMobile) {
+          return ListView.builder(
+            padding: EdgeInsets.all(responsive.horizontalPadding),
+            itemCount: books.length,
+            itemBuilder: (context, index) {
+              return _buildBookListItem(context, books[index], responsive);
+            },
+          );
+        } else {
+          final crossAxisCount = responsive.getGridColumns(mobile: 1, tablet: 2, desktop: 3);
+          return GridView.builder(
+            padding: EdgeInsets.all(responsive.horizontalPadding),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: responsive.getSpacing(),
+              mainAxisSpacing: responsive.getSpacing(),
+              childAspectRatio: responsive.isTablet ? 0.85 : 0.8,
+            ),
+            itemCount: books.length,
+            itemBuilder: (context, index) {
+              return _buildBookListItem(context, books[index], responsive);
+            },
+          );
+        }
       },
     );
   }
 
-  Widget _buildBookListItem(BuildContext context, Book book) {
+  Widget _buildBookListItem(BuildContext context, Book book, Responsive responsive) {
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: responsive.getSpacing()),
+      padding: EdgeInsets.all(responsive.getSpacing(mobile: 16, tablet: 20, desktop: 24)),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -132,19 +222,19 @@ class _BooksPageState extends State<BooksPage> {
           children: [
             // Book Cover
             Container(
-              width: 80,
-              height: 120,
+              width: responsive.getIconSize(mobile: 80, tablet: 100, desktop: 120),
+              height: responsive.getIconSize(mobile: 120, tablet: 150, desktop: 180),
               decoration: BoxDecoration(
                 color: theme.colorScheme.secondary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 Icons.menu_book,
-                size: 40,
+                size: responsive.getIconSize(mobile: 40, tablet: 50, desktop: 60),
                 color: theme.colorScheme.secondary,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: responsive.getSpacing(mobile: 16)),
 
             // Book Info
             Expanded(
@@ -304,56 +394,16 @@ class _BooksPageState extends State<BooksPage> {
     );
   }
 
-  List<Book> _getMockBooks() {
-    return [
-      const Book(
-        id: '1',
-        title: 'Clean Code: A Handbook of Agile Software Craftsmanship',
-        author: 'Robert C. Martin',
-        description: 'Even bad code can function. But if code isn\'t clean, it can bring a development organization to its knees.',
-        rating: 4.7,
-        pageCount: 464,
-        imageUrl: '',
-        category: 'Programming',
-        language: 'English',
-        isFree: false,
-        price: 29.99,
-        publishedYear: 2008,
-        isReading: true,
-        progress: 0.45,
-      ),
-      const Book(
-        id: '2',
-        title: 'Design Patterns: Elements of Reusable Object-Oriented Software',
-        author: 'Gang of Four',
-        description: 'Capturing a wealth of experience about the design of object-oriented software.',
-        rating: 4.6,
-        pageCount: 395,
-        imageUrl: '',
-        category: 'Programming',
-        language: 'English',
-        isFree: true,
-        publishedYear: 1994,
-      ),
-      const Book(
-        id: '3',
-        title: 'The Pragmatic Programmer',
-        author: 'Andrew Hunt, David Thomas',
-        description: 'Your journey to mastery, from apprentice to journeyman to expert.',
-        rating: 4.8,
-        pageCount: 352,
-        imageUrl: '',
-        category: 'Programming',
-        language: 'English',
-        isFree: false,
-        price: 34.99,
-        publishedYear: 1999,
-      ),
-    ];
-  }
 }
 
 class _BookSearchDelegate extends SearchDelegate<String> {
+  @override
+  void showResults(BuildContext context) {
+    // Trigger search when user submits
+    final cubit = context.read<BookCubit>();
+    cubit.loadBooks(search: query);
+    super.showResults(context);
+  }
   @override
   List<Widget> buildActions(BuildContext context) {
     return [
@@ -378,8 +428,44 @@ class _BookSearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return Center(
-      child: Text('Search results for: $query'),
+    return BlocProvider<BookCubit>.value(
+      value: context.read<BookCubit>(),
+      child: BlocBuilder<BookCubit, BookState>(
+        builder: (context, state) {
+          if (state is BookLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final books = state is BookLoaded 
+              ? state.books.where((b) => 
+                  b.title.toLowerCase().contains(query.toLowerCase()) ||
+                  b.author.toLowerCase().contains(query.toLowerCase()) ||
+                  b.description.toLowerCase().contains(query.toLowerCase())
+                ).toList()
+              : <Book>[];
+          
+          if (books.isEmpty) {
+            return Center(child: Text('No books found for: $query'));
+          }
+          
+          return ListView.builder(
+            itemCount: books.length,
+            itemBuilder: (context, index) {
+              final book = books[index];
+              return ListTile(
+                title: Text(book.title),
+                subtitle: Text(book.author),
+                onTap: () {
+                  Navigator.of(context).pushNamed(
+                    AppRouter.bookDetailRoute,
+                    arguments: book,
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

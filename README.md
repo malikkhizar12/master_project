@@ -1,6 +1,6 @@
 # Focus - Learning Companion App
 
-A comprehensive Flutter application for course and book recommendations with user preferences and progress tracking. Built with Clean Architecture, Firebase Authentication, and Firestore for data persistence.
+A comprehensive Flutter application for course and book recommendations with user preferences and progress tracking. Built with Clean Architecture, Firebase Authentication, Firestore for data persistence, and a Python FastAPI backend with ML-powered recommendation engine.
 
 ## 📱 Features
 
@@ -159,6 +159,17 @@ The app follows **Clean Architecture** principles with clear separation of conce
 - **Utilities**:
   - `equatable`: ^2.0.5
   - `image_picker`: ^1.1.2
+  - `http`: ^1.2.2
+
+### Backend (Python FastAPI)
+- **FastAPI**: ^0.121.1 - Modern, fast web framework
+- **Machine Learning Libraries**:
+  - `scikit-learn`: ^1.7.2 - ML algorithms for recommendations
+  - `pandas`: ^2.3.3 - Data manipulation
+  - `numpy`: ^2.3.4 - Numerical computing
+  - `joblib`: ^1.5.2 - Model serialization
+- **API Server**: `uvicorn` - ASGI server
+- **CORS**: Enabled for cross-origin requests
 
 ### Firebase Setup
 - Firebase Authentication enabled
@@ -169,115 +180,245 @@ The app follows **Clean Architecture** principles with clear separation of conce
 ## 📁 Project Structure
 
 ```
-lib/
-├── core/
-│   ├── di/
-│   │   └── service_locator.dart          # Dependency injection setup
-│   ├── error/
-│   │   └── failure.dart                  # Error handling
-│   └── router/
-│       └── app_router.dart               # Navigation routing
-├── features/
-│   ├── auth/
-│   │   ├── data/
-│   │   │   ├── datasources/
-│   │   │   │   └── firebase_auth_datasource.dart
-│   │   │   └── repositories/
-│   │   │       └── auth_repository_impl.dart
-│   │   ├── domain/
-│   │   │   ├── entities/
-│   │   │   │   └── auth_user.dart
-│   │   │   ├── repositories/
-│   │   │   │   └── auth_repository.dart
-│   │   │   └── usecases/
-│   │   │       ├── get_current_user.dart
-│   │   │       ├── send_password_reset_email.dart
-│   │   │       ├── sign_in_with_email.dart
-│   │   │       ├── sign_out.dart
-│   │   │       ├── sign_up_with_email.dart
-│   │   │       └── watch_auth_state.dart
-│   │   └── presentation/
-│   │       ├── cubit/
-│   │       │   ├── auth_cubit.dart
-│   │       │   ├── login_cubit.dart
-│   │       │   ├── signup_cubit.dart
-│   │       │   └── reset_password_cubit.dart
-│   │       └── pages/
-│   │           ├── login_page.dart
-│   │           ├── sign_up_page.dart
-│   │           └── forgot_password_page.dart
-│   ├── profile/
-│   │   ├── data/
-│   │   │   ├── datasources/
-│   │   │   │   └── profile_remote_datasource.dart
-│   │   │   └── repositories/
-│   │   │       └── profile_repository_impl.dart
-│   │   ├── domain/
-│   │   │   ├── entities/
-│   │   │   │   └── user_profile.dart
-│   │   │   └── repositories/
-│   │   │       └── profile_repository.dart
-│   │   └── presentation/
-│   │       ├── cubit/
-│   │       │   ├── profile_cubit.dart
-│   │       │   └── profile_state.dart
-│   │       └── pages/
-│   │           └── edit_profile_page.dart
-│   └── content/
-│       ├── domain/
-│       │   └── entities/
-│       │       ├── course.dart
-│       │       └── book.dart
-│       └── presentation/
-│           ├── pages/
-│           │   ├── main_navigation_page.dart
-│           │   ├── home_page.dart
-│           │   ├── courses_page.dart
-│           │   ├── books_page.dart
-│           │   ├── progress_page.dart
-│           │   ├── profile_page.dart
-│           │   ├── course_detail_page.dart
-│           │   └── book_detail_page.dart
-│           └── widgets/
-│               ├── animated_progress_indicator.dart
-│               └── animated_circular_progress.dart
-├── app.dart                                 # Root app widget
-└── main.dart                                # App entry point
+focus/
+├── lib/                                    # Flutter application code
+│   ├── core/
+│   │   ├── di/
+│   │   │   └── service_locator.dart          # Dependency injection setup
+│   │   ├── error/
+│   │   │   └── failure.dart                  # Error handling
+│   │   ├── network/
+│   │   │   ├── api_client.dart                # HTTP client for API calls
+│   │   │   └── api_constants.dart             # API endpoints and constants
+│   │   └── router/
+│   │       └── app_router.dart               # Navigation routing
+│   ├── features/
+│   │   ├── auth/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── firebase_auth_datasource.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── auth_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   └── auth_user.dart
+│   │   │   │   ├── repositories/
+│   │   │   │   │   └── auth_repository.dart
+│   │   │   │   └── usecases/
+│   │   │   │       ├── get_current_user.dart
+│   │   │   │       ├── send_password_reset_email.dart
+│   │   │   │       ├── sign_in_with_email.dart
+│   │   │   │       ├── sign_out.dart
+│   │   │   │       ├── sign_up_with_email.dart
+│   │   │   │       └── watch_auth_state.dart
+│   │   │   └── presentation/
+│   │   │       ├── cubit/
+│   │   │       │   ├── auth_cubit.dart
+│   │   │       │   ├── login_cubit.dart
+│   │   │       │   ├── signup_cubit.dart
+│   │   │       │   └── reset_password_cubit.dart
+│   │   │       └── pages/
+│   │   │           ├── login_page.dart
+│   │   │           ├── sign_up_page.dart
+│   │   │           └── forgot_password_page.dart
+│   │   ├── profile/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── profile_remote_datasource.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── profile_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   └── user_profile.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── profile_repository.dart
+│   │   │   └── presentation/
+│   │   │       ├── cubit/
+│   │   │       │   ├── profile_cubit.dart
+│   │   │       │   └── profile_state.dart
+│   │   │       └── pages/
+│   │   │           └── edit_profile_page.dart
+│   │   └── content/
+│   │       ├── data/
+│   │       │   └── datasources/
+│   │       │       ├── course_remote_datasource.dart
+│   │       │       ├── book_remote_datasource.dart
+│   │       │       └── progress_remote_datasource.dart
+│   │       ├── domain/
+│   │       │   └── entities/
+│   │       │       ├── course.dart
+│   │       │       └── book.dart
+│   │       └── presentation/
+│   │           ├── pages/
+│   │           │   ├── main_navigation_page.dart
+│   │           │   ├── home_page.dart
+│   │           │   ├── courses_page.dart
+│   │           │   ├── books_page.dart
+│   │           │   ├── progress_page.dart
+│   │           │   ├── profile_page.dart
+│   │           │   ├── course_detail_page.dart
+│   │           │   └── book_detail_page.dart
+│   │           └── widgets/
+│   │               ├── animated_progress_indicator.dart
+│   │               └── animated_circular_progress.dart
+│   ├── app.dart                                 # Root app widget
+│   └── main.dart                                # App entry point
+│
+├── backend_python/                            # Python FastAPI backend
+│   ├── main.py                                # FastAPI application entry point
+│   ├── recommendation_engine.py              # ML recommendation engine
+│   ├── train_model.py                         # Model training script
+│   ├── create_dummy_data.py                   # Generate dummy datasets
+│   ├── clean_data.py                          # Data cleaning and preprocessing
+│   ├── setup_and_run.py                       # One-command setup script
+│   ├── data/                                  # CSV datasets
+│   │   ├── courses.csv
+│   │   ├── books.csv
+│   │   ├── user_interactions.csv
+│   │   ├── courses_cleaned.csv
+│   │   ├── books_cleaned.csv
+│   │   └── user_interactions_cleaned.csv
+│   ├── models/                                # Trained ML models (generated)
+│   │   ├── course_vectorizer.pkl
+│   │   ├── course_similarity.pkl
+│   │   ├── courses_df.pkl
+│   │   ├── user_item_matrix.pkl
+│   │   ├── book_vectorizer.pkl
+│   │   ├── book_similarity.pkl
+│   │   ├── books_df.pkl
+│   │   └── book_user_item_matrix.pkl
+│   ├── README.md                              # Backend documentation
+│   └── QUICK_START.md                         # Quick start guide
+│
+├── android/                                   # Android platform code
+├── ios/                                      # iOS platform code
+├── web/                                      # Web platform code
+├── pubspec.yaml                              # Flutter dependencies
+├── requirements.txt                          # Python dependencies
+└── README.md                                 # This file
 ```
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Flutter SDK (3.9.2 or higher)
-- Dart SDK
-- Firebase account
-- Android Studio / VS Code with Flutter extensions
+- **Flutter SDK** (3.9.2 or higher)
+- **Dart SDK**
+- **Python 3.8+** (for backend)
+- **Firebase account**
+- **Android Studio / VS Code** with Flutter extensions
 
 ### Setup Instructions
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd focus
-   ```
+#### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd focus
+```
 
-2. **Install dependencies**
-   ```bash
-   flutter pub get
-   ```
+#### 2. Backend Setup (Python FastAPI)
 
-3. **Firebase Configuration**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-   - Enable Authentication (Email/Password)
-   - Create Firestore database
-   - Enable Storage
-   - Run `flutterfire configure` to set up Firebase
-   - Ensure `firebase_options.dart` is properly configured
+The backend provides the API endpoints and ML-powered recommendation engine.
 
-4. **Run the app**
-   ```bash
-   flutter run
-   ```
+**Option A: One-Command Setup (Recommended)**
+```bash
+cd backend_python
+python setup_and_run.py
+```
+
+This will automatically:
+- Create dummy datasets (courses, books, user interactions)
+- Clean and preprocess the data
+- Train recommendation models
+
+**Option B: Manual Setup**
+```bash
+cd backend_python
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r ../requirements.txt
+
+# Create data and models directories
+mkdir data models
+
+# Generate dummy data
+python create_dummy_data.py
+
+# Clean data
+python clean_data.py
+
+# Train models
+python train_model.py
+```
+
+**Start the Backend Server**
+```bash
+# From backend_python directory
+python main.py
+```
+
+Or with auto-reload:
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+The API will be available at:
+- **API Base URL**: `http://localhost:8000`
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+
+#### 3. Flutter App Setup
+
+**Install Flutter Dependencies**
+```bash
+# From project root
+flutter pub get
+```
+
+**Configure API Connection**
+
+The Flutter app is pre-configured to connect to `http://127.0.0.1:8000`. If you need to change the backend URL, update `lib/core/network/api_constants.dart`:
+
+```dart
+static const String baseUrl = 'http://127.0.0.1:8000';
+```
+
+**Firebase Configuration**
+- Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+- Enable Authentication (Email/Password)
+- Create Firestore database
+- Enable Storage
+- Run `flutterfire configure` to set up Firebase
+- Ensure `firebase_options.dart` is properly configured
+
+#### 4. Run the Application
+
+**Start Backend First** (in one terminal):
+```bash
+cd backend_python
+python main.py
+```
+
+**Run Flutter App** (in another terminal):
+```bash
+# From project root
+flutter run
+```
+
+For web:
+```bash
+flutter run -d chrome
+```
+
+For Android emulator, update API URL to `http://10.0.2.2:8000` in `api_constants.dart`
 
 ### Firebase Setup Details
 
@@ -312,14 +453,149 @@ lib/
 - Statistics dashboard
 
 ### Recommendations
-- Personalized course recommendations
-- Book recommendations based on interests
+- **ML-Powered Recommendations**: 
+  - Content-based filtering using TF-IDF vectorization and cosine similarity
+  - Collaborative filtering based on user-item interactions
+  - Personalized course and book recommendations
+  - Category and level-based filtering
 - Continue learning section
 - Quick stats overview
+
+## 🤖 Machine Learning & Recommendation Engine
+
+### Recommendation Algorithms
+
+The backend uses advanced ML techniques to provide personalized recommendations:
+
+1. **Content-Based Filtering**:
+   - Uses TF-IDF (Term Frequency-Inverse Document Frequency) vectorization
+   - Analyzes course/book features: title, description, category, instructor/author
+   - Computes cosine similarity between items
+   - Recommends items similar to user's preferences
+
+2. **Collaborative Filtering**:
+   - User-item matrix construction from interaction data
+   - Predicts ratings based on similar users' preferences
+   - Handles cold-start problem with content-based fallback
+
+3. **Hybrid Approach**:
+   - Combines both content-based and collaborative filtering
+   - Provides more accurate and diverse recommendations
+   - Falls back to top-rated items when user data is insufficient
+
+### Model Training
+
+The recommendation models are trained using:
+- **TF-IDF Vectorizer**: Extracts features from text (max_features=1000, ngram_range=(1,2))
+- **Cosine Similarity**: Measures similarity between items
+- **User-Item Matrix**: Tracks user interactions and ratings
+- **Scikit-learn**: Machine learning library for model training
+
+Models are saved as `.pkl` files and loaded at runtime for fast recommendations.
+
+## 🔌 Backend API
+
+### API Endpoints
+
+#### Courses
+- `GET /courses` - Get all courses
+  - Query params: `category`, `level`, `search`, `limit`, `offset`
+- `GET /courses/{course_id}` - Get course by ID
+- `GET /courses/enrolled` - Get enrolled courses
+- `POST /courses/{course_id}/enroll` - Enroll in a course
+
+#### Books
+- `GET /books` - Get all books
+  - Query params: `category`, `search`, `limit`, `offset`
+- `GET /books/{book_id}` - Get book by ID
+- `GET /books/reading` - Get books currently being read
+- `POST /books/{book_id}/start-reading` - Start reading a book
+
+#### Recommendations
+- `GET /recommendations` - Get general recommendations (courses)
+  - Query params: `user_id`, `limit`
+- `GET /recommendations/courses` - Get recommended courses
+  - Query params: `user_id`, `category`, `level`, `limit`
+- `GET /recommendations/books` - Get recommended books
+  - Query params: `user_id`, `category`, `limit`
+
+#### Progress
+- `GET /progress` - Get user progress
+- `GET /progress/statistics` - Get user statistics
+
+### API Features
+- **CORS Enabled**: Cross-origin requests allowed for Flutter web
+- **Pagination**: Support for limit/offset pagination
+- **Filtering**: Category, level, and search filters
+- **Error Handling**: Comprehensive error responses
+- **Auto Documentation**: Swagger UI and ReDoc available
+
+### Data Pipeline
+
+1. **Data Generation** (`create_dummy_data.py`):
+   - Generates 50 courses with metadata
+   - Generates 50 books with metadata
+   - Creates user interaction data (ratings, completions, time spent)
+
+2. **Data Cleaning** (`clean_data.py`):
+   - Removes duplicates
+   - Handles missing values
+   - Validates and normalizes data
+   - Creates cleaned CSV files
+
+3. **Model Training** (`train_model.py`):
+   - Trains TF-IDF vectorizers for courses and books
+   - Computes similarity matrices
+   - Builds user-item matrices
+   - Saves trained models as `.pkl` files
+
+4. **API Serving** (`main.py`):
+   - Loads trained models
+   - Serves recommendations via REST API
+   - Handles real-time queries
+
+## 🔧 Troubleshooting
+
+### Backend Issues
+
+**Port Already in Use**
+- Change port in `backend_python/main.py`:
+  ```python
+  uvicorn.run(app, host="0.0.0.0", port=8001)
+  ```
+- Update Flutter `api_constants.dart` accordingly
+
+**Models Not Found**
+- Run `python setup_and_run.py` or `python train_model.py`
+- Ensure `models/` directory contains all `.pkl` files
+
+**CORS Issues**
+- CORS is enabled for all origins in development
+- For production, update CORS settings in `main.py`
+
+**Data Not Loading**
+- Ensure `data/` directory contains CSV files
+- Run `python create_dummy_data.py` if files are missing
+
+### Flutter App Issues
+
+**API Connection Failed**
+- Ensure backend is running on `http://localhost:8000`
+- Check `api_constants.dart` for correct base URL
+- For Android emulator, use `http://10.0.2.2:8000`
+- For iOS simulator, use `http://localhost:8000`
+
+**Firebase Errors**
+- Verify `firebase_options.dart` is configured
+- Check Firebase project settings
+- Ensure Authentication, Firestore, and Storage are enabled
 
 ## 🎯 Future Enhancements
 
 - [ ] Real-time course/book data from Firestore
+- [ ] User authentication in backend API
+- [ ] Persistent user progress tracking
+- [ ] Advanced ML models (deep learning, neural networks)
 - [ ] Push notifications
 - [ ] Social features (sharing, reviews)
 - [ ] Offline support
@@ -329,6 +605,7 @@ lib/
 - [ ] Course/book favorites
 - [ ] Learning paths
 - [ ] Certificates generation
+- [ ] Real-time collaboration features
 
 ## 📄 License
 
@@ -344,4 +621,18 @@ For support, email support@focus.app or create an issue in the repository.
 
 ---
 
-**Built with ❤️ using Flutter and Firebase**
+## 📚 Additional Documentation
+
+- **Backend Documentation**: See `backend_python/README.md` for detailed backend setup
+- **Quick Start Guide**: See `backend_python/QUICK_START.md` for one-command setup
+
+## 🔗 Useful Links
+
+- [Flutter Documentation](https://flutter.dev/docs)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Firebase Documentation](https://firebase.google.com/docs)
+- [Scikit-learn Documentation](https://scikit-learn.org/)
+
+---
+
+**Built with ❤️ using Flutter, Firebase, and Python FastAPI**
